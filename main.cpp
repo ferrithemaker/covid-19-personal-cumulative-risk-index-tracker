@@ -4,6 +4,8 @@
 #include "string.h"
 #include "WiFi.h"
 #include "esp_wifi.h"
+#include <HTTPClient.h>
+
 
 class MACPool {
 private:
@@ -58,7 +60,13 @@ bool MACPool::getNewMAC() {
 
 using namespace std;
 
+const char* ssid     = "xxxx";         // The SSID (name) of the Wi-Fi network you want to connect to
+const char* password = "xxxx";
+
 unsigned int channel = 1;
+
+float weight;
+
 
 const wifi_promiscuous_filter_t filt={
     .filter_mask=WIFI_PROMIS_FILTER_MASK_MGMT|WIFI_PROMIS_FILTER_MASK_DATA
@@ -158,7 +166,7 @@ void sniffer(void* buf, wifi_promiscuous_pkt_type_t type) {
           // new low and high signals from last 30sec
       }
 
-      riskIndex = riskIndex + recentLowSingal + (2*recentHighSingal);
+      riskIndex = int(riskIndex + recentLowSingal + (2*recentHighSingal) * weight);
 
       // initial estimation -provisional- : activities with moderated risk: 800-1300 / hour
       // activities with low risk: < 800 / hour
@@ -172,7 +180,7 @@ void sniffer(void* buf, wifi_promiscuous_pkt_type_t type) {
 }
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(9600);
   Heltec.begin(true /*DisplayEnable Enable*/, false /*Heltec.LoRa Disable*/, false /*Serial Enable*/);
 
   Heltec.display->clear();
@@ -181,8 +189,65 @@ void setup() {
   Heltec.display->drawString(0, 0,"Starting...");
   Heltec.display->display();
 
+
+
+  // get the information about covid19 local infections
+  WiFi.begin(ssid, password);             // Connect to the network
+  Serial.print("Connecting to ");
+  Serial.print(ssid); 
+  Serial.println(" ...");
+  int i = 0;
+  while (WiFi.status() != WL_CONNECTED && i < 50) { // Wait for the Wi-Fi to connect
+    delay(1000);
+    Serial.print(++i); 
+    Serial.print(' ');
+  }
+  
+  if (i < 50) { // connection OK
+    Serial.println('\n');
+    Serial.println("Connection established!");  
+    Serial.print("IP address:\t");
+    Serial.println(WiFi.localIP());
+    HTTPClient client;
+    client.begin("http://api.ferranfabregas.me/covid19");
+    int httpCode = client.GET();
+    if (httpCode > 0) {
+      // only for testing
+      String payload = client.getString();
+      Serial.println(payload);
+      int inf_pos = payload.indexOf("infected");
+      String infected = payload.substring(inf_pos+11,payload.indexOf(",",inf_pos));
+      Serial.println(infected);
+
+      int inf_inh = payload.indexOf("inhabitants");
+      String inhabitants = payload.substring(inf_inh+14,payload.indexOf(",",inf_inh));
+      Serial.println(inhabitants);
+      weight = (infected.toFloat() / inhabitants.toFloat()) * 100;
+      Serial.println(weight);
+      
+
+      // Print values.
+      Serial.println(payload);
+      Serial.println(inf_pos);
+      Serial.println(inf_inh);
+
+    } else {
+      Serial.println("Error on HTTP request");
+    }
+  } else { 
+    Serial.println("failed!");
+    delay(2000);
+  }
+  WiFi.disconnect();
+  WiFi.enableSTA(false);
+  WiFi.softAPdisconnect(true);
+  esp_wifi_disconnect();
+  delay(5000);
+  
+  Serial.println("Setting promiscuous mode...");
   wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
   esp_wifi_init(&cfg);
+  // set WiFi in promiscuous mode
   //esp_wifi_set_mode(WIFI_MODE_STA);            // Promiscuous works only with station mode
   esp_wifi_set_mode(WIFI_MODE_NULL);
   esp_wifi_start();
