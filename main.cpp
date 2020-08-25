@@ -65,7 +65,7 @@ const char* password = "xxxx";         // network password
 
 unsigned int channel = 1;
 
-float weight; // weigh the index with real time data
+float weight = 1.0; // weigh the index with real time data
 
 
 const wifi_promiscuous_filter_t filt={
