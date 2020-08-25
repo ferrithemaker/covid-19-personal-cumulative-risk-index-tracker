@@ -219,7 +219,6 @@ void setup() {
   WiFi.disconnect();
   WiFi.enableSTA(false);
   WiFi.softAPdisconnect(true);
-  esp_wifi_disconnect();
   delay(5000);
   
   Serial.println("Setting promiscuous mode...");
