@@ -61,18 +61,17 @@ bool MACPool::getNewMAC() {
 using namespace std;
 
 const char* ssid     = "xxxx";         // The SSID (name) of the Wi-Fi network you want to connect to
-const char* password = "xxxx";
+const char* password = "xxxx";         // network password
 
 unsigned int channel = 1;
 
-float weight;
+float weight; // weigh the index with real time data
 
 
 const wifi_promiscuous_filter_t filt={
     .filter_mask=WIFI_PROMIS_FILTER_MASK_MGMT|WIFI_PROMIS_FILTER_MASK_DATA
 };
 
-//vector<String> macArray;
 
 vector<MACPool> listOfMAC;
 
@@ -115,14 +114,9 @@ void sniffer(void* buf, wifi_promiscuous_pkt_type_t type) {
 
     sourceMac.toUpperCase();
 
-    if (signal > -70) {
-      // Prevent duplicates
-      /*for (int i = 0; i < macArray.size(); i++) {
-          if (sourceMac == macArray[i]) {
-              return;
-          }
-      }*/
+    if (signal > -70) { // signal level threshold
 
+      // Prevent duplicates
       for (int i = 0; i < listOfMAC.size(); i++) {
           if (sourceMac == listOfMAC[i].getMAC()) {
               listOfMAC[i].updateTime(millis()); // update the last time MAC found
@@ -131,19 +125,11 @@ void sniffer(void* buf, wifi_promiscuous_pkt_type_t type) {
           }
       }
 
-
-      //macArray.push_back(sourceMac);
-
       // new MAC
 
       listOfMAC.push_back(MACPool(sourceMac,signal,millis(),true));
 
-      //Serial.print("M1: ");
-      //Serial.println(sourceMac); // WORKING!!!!
-      //Serial.print("M2: ");
       Serial.println(listOfMAC[listOfMAC.size()-1].getMAC());
-      //Serial.print("Size: ");
-      //Serial.println(listOfMAC.size());
 
       // purge outdated MACs
 
@@ -192,6 +178,7 @@ void setup() {
 
 
   // get the information about covid19 local infections
+
   WiFi.begin(ssid, password);             // Connect to the network
   Serial.print("Connecting to ");
   Serial.print(ssid); 
@@ -209,28 +196,19 @@ void setup() {
     Serial.print("IP address:\t");
     Serial.println(WiFi.localIP());
     HTTPClient client;
-    client.begin("http://api.ferranfabregas.me/covid19");
+    client.begin("http://api.ferranfabregas.me/covid19"); // not the definitive API, for testing only
     int httpCode = client.GET();
     if (httpCode > 0) {
       // only for testing
-      String payload = client.getString();
-      Serial.println(payload);
+      String payload = client.getString(); // get the data
+      //Serial.println(payload);
       int inf_pos = payload.indexOf("infected");
       String infected = payload.substring(inf_pos+11,payload.indexOf(",",inf_pos));
-      Serial.println(infected);
-
       int inf_inh = payload.indexOf("inhabitants");
       String inhabitants = payload.substring(inf_inh+14,payload.indexOf(",",inf_inh));
-      Serial.println(inhabitants);
+      //Serial.println(inhabitants);
       weight = (infected.toFloat() / inhabitants.toFloat()) * 100;
       Serial.println(weight);
-      
-
-      // Print values.
-      Serial.println(payload);
-      Serial.println(inf_pos);
-      Serial.println(inf_inh);
-
     } else {
       Serial.println("Error on HTTP request");
     }
