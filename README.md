@@ -18,7 +18,8 @@ These data allow us to calculate what kind of environment we are in, generating 
 - Very dense environment and high variability: (high / very high risk)
 - Low dense environment and low variability: (low risk)
 - Low dense environment and high variability: (moderate risk)
-- Based on these profiles we can calculate a daily accumulated index that will tell us not only if at a specific moment we are in a potentially dangerous environment (since this is generally quite obvious), but it will also show us an accumulated value throughout the day, which will give us a global assessment of our daily behaviour (low risk / medium risk / high risk) and will allow us to be aware in order to adjust it and minimize further risks.
+
+Based on these profiles we can calculate a daily accumulated index that will tell us not only if at a specific moment we are in a potentially dangerous environment (since this is generally quite obvious), but it will also show us an accumulated value throughout the day, which will give us a global assessment of our daily behaviour (low risk / medium risk / high risk) and will allow us to be aware in order to adjust it and minimize further risks.
 
 This index can be weighted with real time data of local infections rates from online oficial sources like covid-19 API to create a more reliable index.
 
