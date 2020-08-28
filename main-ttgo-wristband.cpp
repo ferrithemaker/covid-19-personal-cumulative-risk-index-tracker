@@ -1,11 +1,10 @@
 #include <Arduino.h>
 
-#include "WiFi.h"
+//#include "WiFi.h"
 #include "esp_wifi.h"
 #include <HTTPClient.h>
 #include <vector>
 #include "string.h"
-
 #include <SPI.h>
 
 #include <TFT_eSPI.h> // Hardware-specific library
@@ -14,7 +13,11 @@
 // comment the line #include <User_Setup.h>
 // uncomment the line #include <User_Setups/Setup26_TTGO_T_Wristband.h>
 
+
+
 TFT_eSPI tft = TFT_eSPI();       // Invoke custom library
+
+
 
 
 class MACPool {
@@ -67,6 +70,7 @@ bool MACPool::getNewMAC() {
   return this->newMAC;
 }
 
+int screen = 1;
 
 using namespace std;
 
@@ -86,6 +90,7 @@ const wifi_promiscuous_filter_t filt={
 vector<MACPool> listOfMAC;
 
 int riskIndex = 0;
+int oldIndex = 0;
 String riskValue = "low";
 
 typedef struct {
@@ -139,7 +144,7 @@ void sniffer(void* buf, wifi_promiscuous_pkt_type_t type) {
 
       listOfMAC.push_back(MACPool(sourceMac,signal,millis(),true));
 
-      Serial.println(listOfMAC[listOfMAC.size()-1].getMAC());
+      //Serial.println(listOfMAC[listOfMAC.size()-1].getMAC());
 
       // purge outdated MACs
 
@@ -177,9 +182,16 @@ void sniffer(void* buf, wifi_promiscuous_pkt_type_t type) {
 
 
 void setup(void) {
+  //Serial.begin(9600);
+  pinMode(25, PULLUP);
+  pinMode(27, OUTPUT);
+  pinMode(33,PULLUP);
+  //digitalWrite(25, HIGH);
+  //digitalWrite(4, HIGH);
   tft.init();
   tft.setRotation(2);
 
+  // get real time data from online sources disabled
   /*
   WiFi.begin(ssid, password);             // Connect to the network
   Serial.print("Connecting to ");
@@ -224,14 +236,17 @@ void setup(void) {
   delay(5000);
   */
 
-  Serial.println("Setting promiscuous mode...");
+  //Serial.println("Setting promiscuous mode...");
   wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
   esp_wifi_init(&cfg);
   // set WiFi in promiscuous mode
   //esp_wifi_set_mode(WIFI_MODE_STA);            // Promiscuous works only with station mode
   esp_wifi_set_mode(WIFI_MODE_NULL);
-  esp_wifi_start();
+  // power save options
+  esp_wifi_set_ps(WIFI_PS_MAX_MODEM);
   esp_wifi_set_storage(WIFI_STORAGE_RAM);
+  esp_wifi_start();
+  esp_wifi_set_max_tx_power(-4);
   esp_wifi_set_promiscuous(true);
   esp_wifi_set_promiscuous_filter(&filt);
   esp_wifi_set_promiscuous_rx_cb(&sniffer);   // Set up promiscuous callback
@@ -239,23 +254,35 @@ void setup(void) {
 }
 
 void loop() {
-  
-  tft.fillScreen(0x000000);
-  
-  tft.setCursor(0, 0, 2);
-  tft.setTextColor(TFT_WHITE,TFT_BLACK);  
-  tft.setTextSize(1);
-  // We can now plot text on screen using the "print" class
-  tft.println("Covid-19");
-  tft.println("daily");
-  tft.println("accumulated");
-  tft.println("risk index");
-  tft.println("");
-  tft.setTextFont(4);
-  tft.println(riskValue);
-  tft.println((String)riskIndex);
+
+  if (oldIndex!=riskIndex) {
+    tft.fillScreen(0x000000);
+    tft.setCursor(0, 0, 2);
+    tft.setTextColor(TFT_WHITE,TFT_BLACK);  
+    tft.setTextSize(1);
+    // We can now plot text on screen using the "print" class
+    tft.println("Covid-19");
+    tft.println("daily");
+    tft.println("accumulated");
+    tft.println("risk index");
+    tft.println("");
+    tft.setTextFont(4);
+    tft.println(riskValue);
+    tft.println((String)riskIndex);
+    oldIndex = riskIndex;
+  }
+  if (digitalRead(33)) {
+    if (screen==0) {
+      digitalWrite(27,HIGH);
+      screen = 1;
+    } else {
+      digitalWrite(27,LOW);
+      screen = 0;
+    }
+  }
+  //Serial.println();
   channel++;
   if(channel == 11) channel = 1;
   esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
-  delay(1000);
+  delay(2000);
 }
