@@ -25,5 +25,27 @@ This index can be weighted with real time data of local infections rates from on
 
 The device consists of a wireless connectivity microcontroller with the ability to work in promiscuous mode (in our case an ESP32) and a battery (a small power bank or a LiPo battery). To display the information you can use an OLED screen (this is the case in the demo example) or simply a color coding system using LEDs to indicate the different levels of accumulated risk.
 
+## Build and Flashing
+
+First of all, install PlatformIO with your favourite IDE (i.e. VSCode). Follow [this](https://platformio.org/platformio-ide) instructions.
+
+Clone the repo or download it and then:
+
+Connect wristband via USB with the supplied daughter board. In Windows 10, drivers are installed automatically. I guess with other OS will be automatically installed too.
+
+After plugging wristband, please select `env` variant **esp32dev** on VisualCode and build it, `PlatformIO icon->env:esp32dev->Build`:
+
+![Upload Button](https://raw.githubusercontent.com/hpsaturn/TTGO-T-Wristband/av/pio_config_envs/resources/vcode_env_usb_build.jpg)
+
+then, in the same menu, plase select `upload`.
+
+or build and upload it with the `pio` command line:
+
+```bash
+pio run -e esp32dev --target upload
+```
+
+PlatformIO will build and upload the binaries to the TTGO T-Wristband via USB.
+
 
 
