@@ -6,6 +6,7 @@
 
 
 #include <Arduino.h>
+#include <MACPool.hpp>
 
 #include "WiFi.h"
 #include "esp_wifi.h"
@@ -23,56 +24,6 @@
 
 
 TFT_eSPI tft = TFT_eSPI();       // Invoke custom library
-
-class MACPool {
-private:
- String mac;
- int signal;
- unsigned long time;
- bool newMAC;
- 
- 
-public:
-MACPool(String,int,unsigned long,bool);
-String getMAC();
-int getSignal();
-unsigned long getTime();
-void updateTime(unsigned long);
-bool getNewMAC();
-void updateNewMAC(bool);
-};
-
-MACPool::MACPool(String mac,int signal,unsigned long time,bool newMAC)
-{
- this->mac = mac;
- this->signal = signal;
- this->time = time;
- this->newMAC = newMAC;
-}
-
-String MACPool::getMAC() {
-  return this->mac;
-}
-
-int MACPool::getSignal() {
-  return this->signal;
-}
-
-unsigned long MACPool::getTime() {
-  return this->time;
-}
-
-void MACPool::updateTime(unsigned long time) {
-  this->time=time;
-}
-
-void MACPool::updateNewMAC(bool nm) {
-  this->newMAC=nm;
-}
-
-bool MACPool::getNewMAC() {
-  return this->newMAC;
-}
 
 int screen = 1; // screen on or off
 
