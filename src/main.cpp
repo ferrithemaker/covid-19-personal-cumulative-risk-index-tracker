@@ -1,10 +1,3 @@
-//platformio.ini
-//[env:pico32]
-//platform = espressif32
-//board = pico32
-//framework = arduino
-
-
 #include <Arduino.h>
 #include <MACPool.hpp>
 
@@ -15,15 +8,15 @@
 #include "string.h"
 #include <SPI.h>
 
-#include <TFT_eSPI.h> // Hardware-specific library
-// VERY IMPORTANT!!! 
-// You need to modify the library file User_Setup_Select.h
-// comment the line #include <User_Setup.h>
-// uncomment the line #include <User_Setups/Setup26_TTGO_T_Wristband.h>
-
-
-
+#ifdef PICO32
+#include <TFT_eSPI.h> // Hardware TTGO Twristband
 TFT_eSPI tft = TFT_eSPI();       // Invoke custom library
+#endif
+
+#ifdef HELTEC
+#include "heltec.h"
+#endif
+
 
 int screen = 1; // screen on or off
 
@@ -138,8 +131,137 @@ void sniffer(void* buf, wifi_promiscuous_pkt_type_t type) {
     }
 }
 
+void getAPIinfo() {
+    // get the information about covid19 local infections
+
+    WiFi.begin(ssid, password);  // Connect to the network
+    Serial.print("Connecting to ");
+    Serial.print(ssid);
+    Serial.println(" ...");
+    int i = 0;
+    while (WiFi.status() != WL_CONNECTED && i < 50) {  // Wait for the Wi-Fi to connect
+        delay(1000);
+        Serial.print(++i);
+        Serial.print(' ');
+    }
+
+    if (i < 50) {  // connection OK
+        Serial.println('\n');
+        Serial.println("Connection established!");
+        Serial.print("IP address:\t");
+        Serial.println(WiFi.localIP());
+        HTTPClient client;
+        client.begin("http://api.ferranfabregas.me/covid19");  // not the definitive API, for testing only
+        int httpCode = client.GET();
+        if (httpCode > 0) {
+            // only for testing
+            String payload = client.getString();  // get the data
+            //Serial.println(payload);
+            int inf_pos = payload.indexOf("infected");
+            String infected = payload.substring(inf_pos + 11, payload.indexOf(",", inf_pos));
+            int inf_inh = payload.indexOf("inhabitants");
+            String inhabitants = payload.substring(inf_inh + 14, payload.indexOf(",", inf_inh));
+            //Serial.println(inhabitants);
+            weight = (infected.toFloat() / inhabitants.toFloat()) * 100;
+            Serial.println(weight);
+        } else {
+            Serial.println("Error on HTTP request");
+        }
+    } else {
+        Serial.println("failed!");
+        delay(2000);
+    }
+    WiFi.disconnect();
+    WiFi.enableSTA(false);
+    WiFi.softAPdisconnect(true);
+}
+
+void displayInfo() {
+#ifdef PICO32
+    //if (millis() - lastMillis > 60000) { // promiscuous mode is enable 1 time every 5 min (to save battery)
+    float raw = analogRead(35);
+    float voltage = ((raw / 1023) * ARef * 3.3) - 4.8;  // battery control
+    if (digitalRead(33)) {
+        Serial.println("Turn on screen!");
+        digitalWrite(27, HIGH);
+        tft.fillScreen(0x000000);
+        tft.setCursor(0, 0, 2);
+        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        tft.setTextSize(1);
+        // We can now plot text on screen using the "print" class
+        tft.println("Covid-19");
+        tft.println("daily");
+        tft.println("accumulated");
+        tft.println("risk index");
+        tft.println("");
+        tft.setTextFont(4);
+        tft.println(riskValue);
+        tft.println((String)riskIndex);
+        tft.println((String)voltage);
+    }
+#endif
+
+#ifdef HELTEC
+    Heltec.display->clear();
+    Heltec.display->setTextAlignment(TEXT_ALIGN_LEFT);
+    Heltec.display->setFont(ArialMT_Plain_10);
+    Heltec.display->drawString(0, 0, "Covid-19 accumulated daily");
+    Heltec.display->drawString(0, 10, "personal risk index:");
+    Heltec.display->setFont(ArialMT_Plain_16);
+    Heltec.display->drawString(0, 24, riskValue);
+    Heltec.display->drawString(0, 44, (String)riskIndex);
+    Heltec.display->display();
+#endif
+}
+
+void displayOff() {
+#ifdef PICO32
+    Serial.println("Turn off screen!");
+    //Serial.println(millis());
+    digitalWrite(27, LOW);
+#endif
+}
+
+void snifferLoop(){
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    esp_wifi_init(&cfg);
+    //Serial.println("Enable WiFi");
+    // set WiFi in promiscuous mode
+    //esp_wifi_set_mode(WIFI_MODE_STA);            // Promiscuous works only with station mode
+    esp_wifi_set_mode(WIFI_MODE_NULL);
+    // power save options
+    esp_wifi_set_ps(WIFI_PS_MAX_MODEM);
+    esp_wifi_set_storage(WIFI_STORAGE_RAM);
+    esp_wifi_start();
+    esp_wifi_set_max_tx_power(-4);
+    esp_wifi_set_promiscuous(true);
+    esp_wifi_set_promiscuous_filter(&filt);
+    esp_wifi_set_promiscuous_rx_cb(&sniffer);  // Set up promiscuous callback
+    esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
+    for (int loops = 0; loops < 10; loops++) {
+        for (channel = 0; channel < 12; channel++) {
+            esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
+            delay(100);
+        }
+        delay(100);
+    }
+}
+
 void setup(void) {
   Serial.begin(115200);
+
+  #ifdef HELTEC
+
+  Heltec.begin(true /*DisplayEnable Enable*/, false /*Heltec.LoRa Disable*/, false /*Serial Enable*/);
+  Heltec.display->clear();
+  Heltec.display->setTextAlignment(TEXT_ALIGN_LEFT);
+  Heltec.display->setFont(ArialMT_Plain_16);
+  Heltec.display->drawString(0, 0,"Starting...");
+  Heltec.display->display();
+
+  #endif
+
+  #ifdef PICO32
   pinMode(25, PULLUP); // button power
   pinMode(27, OUTPUT); // screen backlight
   pinMode(33,PULLUP); // button
@@ -151,104 +273,21 @@ void setup(void) {
   esp_sleep_enable_timer_wakeup(SleepSecs * 1000000);
   esp_sleep_enable_ext0_wakeup((gpio_num_t)33,1); //1 = Low to High, 0 = High to Low. Pin pulled HIGH
 
-  // get real time data from online sources disabled
-  /*
-  WiFi.begin(ssid, password);             // Connect to the network
-  Serial.print("Connecting to ");
-  Serial.print(ssid); 
-  Serial.println(" ...");
-  int i = 0;
-  while (WiFi.status() != WL_CONNECTED && i < 50) { // Wait for the Wi-Fi to connect
-    delay(1000);
-    Serial.print(++i); 
-    Serial.print(' ');
-  }
-  
-  if (i < 50) { // connection OK
-    Serial.println('\n');
-    Serial.println("Connection established!");  
-    Serial.print("IP address:\t");
-    Serial.println(WiFi.localIP());
-    HTTPClient client;
-    client.begin("http://api.ferranfabregas.me/covid19"); // not the definitive API, for testing only
-    int httpCode = client.GET();
-    if (httpCode > 0) {
-      // only for testing
-      String payload = client.getString(); // get the data
-      //Serial.println(payload);
-      int inf_pos = payload.indexOf("infected");
-      String infected = payload.substring(inf_pos+11,payload.indexOf(",",inf_pos));
-      int inf_inh = payload.indexOf("inhabitants");
-      String inhabitants = payload.substring(inf_inh+14,payload.indexOf(",",inf_inh));
-      //Serial.println(inhabitants);
-      weight = (infected.toFloat() / inhabitants.toFloat()) * 100;
-      Serial.println(weight);
-    } else {
-      Serial.println("Error on HTTP request");
-    }
-  } else { 
-    Serial.println("failed!");
-    delay(2000);
-  }
-  WiFi.disconnect();
-  WiFi.enableSTA(false);
-  WiFi.softAPdisconnect(true);
-  delay(5000);
-  */
+  #endif
+
+  getAPIinfo();
+
 }
 
 void loop() {
-  Serial.println("System sleeps");
-  delay(100);
-  esp_light_sleep_start();
-  Serial.println("System awakes");
-
-  //if (millis() - lastMillis > 60000) { // promiscuous mode is enable 1 time every 5 min (to save battery)
-  float raw = analogRead(35);
-  float voltage = ((raw/1023)*ARef*3.3)-4.8; // battery control
-  if (digitalRead(33)) {
-    Serial.println("Turn on screen!");
-    digitalWrite(27,HIGH);
-    tft.fillScreen(0x000000);
-    tft.setCursor(0, 0, 2);
-    tft.setTextColor(TFT_WHITE,TFT_BLACK);  
-    tft.setTextSize(1);
-    // We can now plot text on screen using the "print" class
-    tft.println("Covid-19");
-    tft.println("daily");
-    tft.println("accumulated");
-    tft.println("risk index");
-    tft.println("");
-    tft.setTextFont(4);
-    tft.println(riskValue);
-    tft.println((String)riskIndex);
-    tft.println((String)voltage);
-}
-  
-  wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-  esp_wifi_init(&cfg);
-  //Serial.println("Enable WiFi");
-  // set WiFi in promiscuous mode
-  //esp_wifi_set_mode(WIFI_MODE_STA);            // Promiscuous works only with station mode
-  esp_wifi_set_mode(WIFI_MODE_NULL);
-  // power save options
-  esp_wifi_set_ps(WIFI_PS_MAX_MODEM);
-  esp_wifi_set_storage(WIFI_STORAGE_RAM);
-  esp_wifi_start();
-  esp_wifi_set_max_tx_power(-4);
-  esp_wifi_set_promiscuous(true);
-  esp_wifi_set_promiscuous_filter(&filt);
-  esp_wifi_set_promiscuous_rx_cb(&sniffer);   // Set up promiscuous callback
-  esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
-    for (int loops=0;loops<10;loops++) {
-      for (channel=0;channel<12;channel++) {
-        esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
-        delay(100);
-      }
+    Serial.println("System sleeps");
     delay(100);
-    }
-  Serial.println("Turn off screen!");
-  //Serial.println(millis());
-  digitalWrite(27,LOW);
-  delay(100);
+    esp_light_sleep_start();
+    Serial.println("System awakes");
+
+    displayInfo();
+    snifferLoop();
+    displayOff();
+    
+    delay(100);
 }

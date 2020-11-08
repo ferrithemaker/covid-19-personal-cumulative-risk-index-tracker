@@ -42,10 +42,15 @@ then, in the same menu, plase select `upload`.
 or build and upload it with the `pio` command line:
 
 ```bash
-pio run -e esp32dev --target upload
+pio run -e pico32USB --target upload
 ```
 
-PlatformIO will build and upload the binaries to the TTGO T-Wristband via USB.
+PlatformIO will build and upload the binaries to the TTGO T-Wristband via USB.  
 
+or  
 
+```bash
+pio run -e heltec --target upload
+```
 
+PlatformIO will build and upload the binaries to the TTGO T-Wristband via USB.  
