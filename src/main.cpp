@@ -139,7 +139,7 @@ void sniffer(void* buf, wifi_promiscuous_pkt_type_t type) {
 }
 
 void setup(void) {
-  Serial.begin(9600);
+  Serial.begin(115200);
   pinMode(25, PULLUP); // button power
   pinMode(27, OUTPUT); // screen backlight
   pinMode(33,PULLUP); // button
