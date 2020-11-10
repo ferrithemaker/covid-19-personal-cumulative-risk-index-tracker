@@ -193,26 +193,41 @@ void drawProgressBar(uint16_t x0, uint16_t y0, uint16_t w, uint16_t h, uint8_t p
 #endif
 }
 
+void displayWelcome() {
+#ifdef PICO32
+    tft.setCursor(0, 0, 2);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.setTextSize(1);
+    // We can now plot text on screen using the "print" class
+    tft.setTextFont(2);
+    tft.println("Covid-19");
+    tft.println("risk index");
+    tft.println("");
+    tft.println("Scanning..");
+#endif
+}
+
 void displayInfo() {
 #ifdef PICO32
     //if (millis() - lastMillis > 60000) { // promiscuous mode is enable 1 time every 5 min (to save battery)
     float raw = analogRead(35);
     float voltage = ((raw / 1023) * ARef * 3.3) - 4.8;  // battery control
-    digitalWrite(27, HIGH);
-    tft.fillScreen(0x000000);
+    tft.fillScreen(TFT_BLACK);
     tft.setCursor(0, 0, 2);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
     tft.setTextSize(1);
-    // We can now plot text on screen using the "print" class
     tft.println("Covid-19");
     tft.println("daily");
     tft.println("accumulated");
-    tft.println("risk index");
+    tft.println("risk index:");
     tft.println("");
     tft.setTextFont(4);
     tft.println(riskValue);
     tft.println((String)riskIndex);
-    tft.println((String)voltage);
+    tft.setTextFont(1);
+    tft.println("");
+    tft.setTextDatum(BR_DATUM);
+    tft.println((String)voltage+"v");
 #endif
 
 #ifdef HELTEC
@@ -320,12 +335,12 @@ void setup(void) {
 
 void loop() {
     Serial.println("System awakes");
-    // displayInfo();
+    displayWelcome();
     snifferLoop();
     displayInfo();
 #ifdef PICO32
     Serial.println("System sleeps");
-    delay(7000);
+    delay(8000);
     deepSleep();
 #endif
 }
