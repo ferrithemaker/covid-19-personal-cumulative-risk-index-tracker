@@ -176,29 +176,43 @@ void getAPIinfo() {
     WiFi.softAPdisconnect(true);
 }
 
+void drawProgressBar(uint16_t x0, uint16_t y0, uint16_t w, uint16_t h, uint8_t percentage, uint16_t frameColor, uint16_t barColor) {
+#ifdef PICO32
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.setTextDatum(TC_DATUM);
+    tft.setTextPadding(tft.textWidth(" 888% "));
+    tft.drawString(String(percentage) + "%", 145, 35);
+    if (percentage == 0) {
+        tft.fillRoundRect(x0, y0, w, h, 3, TFT_BLACK);
+    }
+    uint8_t margin = 2;
+    uint16_t barHeight = h - 2 * margin;
+    uint16_t barWidth = w - 2 * margin;
+    tft.drawRoundRect(x0, y0, w, h, 3, frameColor);
+    tft.fillRect(x0 + margin, y0 + margin, barWidth * percentage / 100.0, barHeight, barColor);
+#endif
+}
+
 void displayInfo() {
 #ifdef PICO32
     //if (millis() - lastMillis > 60000) { // promiscuous mode is enable 1 time every 5 min (to save battery)
     float raw = analogRead(35);
     float voltage = ((raw / 1023) * ARef * 3.3) - 4.8;  // battery control
-    if (digitalRead(33)) {
-        Serial.println("Turn on screen!");
-        digitalWrite(27, HIGH);
-        tft.fillScreen(0x000000);
-        tft.setCursor(0, 0, 2);
-        tft.setTextColor(TFT_WHITE, TFT_BLACK);
-        tft.setTextSize(1);
-        // We can now plot text on screen using the "print" class
-        tft.println("Covid-19");
-        tft.println("daily");
-        tft.println("accumulated");
-        tft.println("risk index");
-        tft.println("");
-        tft.setTextFont(4);
-        tft.println(riskValue);
-        tft.println((String)riskIndex);
-        tft.println((String)voltage);
-    }
+    digitalWrite(27, HIGH);
+    tft.fillScreen(0x000000);
+    tft.setCursor(0, 0, 2);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.setTextSize(1);
+    // We can now plot text on screen using the "print" class
+    tft.println("Covid-19");
+    tft.println("daily");
+    tft.println("accumulated");
+    tft.println("risk index");
+    tft.println("");
+    tft.setTextFont(4);
+    tft.println(riskValue);
+    tft.println((String)riskIndex);
+    tft.println((String)voltage);
 #endif
 
 #ifdef HELTEC
@@ -239,55 +253,79 @@ void snifferLoop(){
     esp_wifi_set_promiscuous_rx_cb(&sniffer);  // Set up promiscuous callback
     esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
     for (int loops = 0; loops < 10; loops++) {
+        drawProgressBar(0,TFT_HEIGHT/2, TFT_WIDTH, 10, (loops+1)*10, TFT_WHITE, TFT_BLUE);
         for (channel = 0; channel < 12; channel++) {
             esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
-            delay(100);
+            delay(50);
         }
-        delay(100);
     }
 }
 
+void tftInit() {
+    tft.init();
+    // tft.setRotation(1);
+    // tft.setSwapBytes(true);
+    tft.fillScreen(TFT_BLACK);
+    ledcSetup(0, 5000, 8);
+    ledcAttachPin(TFT_BL, 0);
+    ledcWrite(0, 185);
+}
+
+void tftSleep() {
+    tft.fillScreen(TFT_BLACK);
+    tft.writecommand(ST7735_SWRESET);
+    delay(100);
+    tft.writecommand(ST7735_SLPIN);
+    delay(150);
+    tft.writecommand(ST7735_DISPOFF);
+}
+
+void deactivateWifi() {
+    WiFi.mode(WIFI_OFF);
+}
+
+void deepSleep() {
+    tftSleep();
+    deactivateWifi();
+    pinMode(39, GPIO_MODE_INPUT);
+    esp_sleep_enable_ext1_wakeup(GPIO_SEL_33, ESP_EXT1_WAKEUP_ANY_HIGH);
+    esp_deep_sleep_disable_rom_logging();
+    esp_deep_sleep_start();
+}
+
 void setup(void) {
-  Serial.begin(115200);
+    Serial.begin(115200);
 
-  #ifdef HELTEC
+#ifdef HELTEC
 
-  Heltec.begin(true /*DisplayEnable Enable*/, false /*Heltec.LoRa Disable*/, false /*Serial Enable*/);
-  Heltec.display->clear();
-  Heltec.display->setTextAlignment(TEXT_ALIGN_LEFT);
-  Heltec.display->setFont(ArialMT_Plain_16);
-  Heltec.display->drawString(0, 0,"Starting...");
-  Heltec.display->display();
+    Heltec.begin(true /*DisplayEnable Enable*/, false /*Heltec.LoRa Disable*/, false /*Serial Enable*/);
+    Heltec.display->clear();
+    Heltec.display->setTextAlignment(TEXT_ALIGN_LEFT);
+    Heltec.display->setFont(ArialMT_Plain_16);
+    Heltec.display->drawString(0, 0, "Starting...");
+    Heltec.display->display();
 
-  #endif
+#endif
 
-  #ifdef PICO32
-  pinMode(25, PULLUP); // button power
-  pinMode(27, OUTPUT); // screen backlight
-  pinMode(33,PULLUP); // button
+#ifdef PICO32
 
-  tft.init();
-  tft.setRotation(2);
-  tft.fillScreen(0x000000);
+    pinMode(25, PULLUP);  // button power
+    pinMode(33, PULLUP);  // button
+    tftInit();
 
-  esp_sleep_enable_timer_wakeup(SleepSecs * 1000000);
-  esp_sleep_enable_ext0_wakeup((gpio_num_t)33,1); //1 = Low to High, 0 = High to Low. Pin pulled HIGH
+#endif
 
-  #endif
-
-  getAPIinfo();
-
+    //getAPIinfo();
 }
 
 void loop() {
-    Serial.println("System sleeps");
-    delay(100);
-    esp_light_sleep_start();
     Serial.println("System awakes");
-
-    displayInfo();
+    // displayInfo();
     snifferLoop();
-    displayOff();
-    
-    delay(100);
+    displayInfo();
+#ifdef PICO32
+    Serial.println("System sleeps");
+    delay(7000);
+    deepSleep();
+#endif
 }
