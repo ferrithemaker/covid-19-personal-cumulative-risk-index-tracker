@@ -17,6 +17,8 @@ TFT_eSPI tft = TFT_eSPI();       // Invoke custom library
 #include "heltec.h"
 #endif
 
+const bool cumulative_index = false; // if cumulative_index is disabled, device resets the index and the MAC pool
+
 
 int screen = 1; // screen on or off
 
@@ -308,6 +310,16 @@ void deepSleep() {
     esp_deep_sleep_start();
 }
 
+void lightSleep() {
+    tftSleep();
+    deactivateWifi();
+    pinMode(39, GPIO_MODE_INPUT);
+    esp_sleep_enable_timer_wakeup(SleepSecs * 1000000);
+    //esp_sleep_enable_ext0_wakeup((gpio_num_t)33,1); //1 = Low to High, 0 = High to Low. Pin pulled 
+    esp_sleep_enable_ext1_wakeup(GPIO_SEL_33, ESP_EXT1_WAKEUP_ANY_HIGH);
+    esp_light_sleep_start();
+}
+
 void setup(void) {
     Serial.begin(115200);
 
@@ -330,17 +342,19 @@ void setup(void) {
 
 #endif
 
+
     //getAPIinfo();
 }
 
 void loop() {
     Serial.println("System awakes");
+    tftInit();
     displayWelcome();
     snifferLoop();
     displayInfo();
 #ifdef PICO32
     Serial.println("System sleeps");
     delay(8000);
-    deepSleep();
+    if (cumulative_index) lightSleep(); else deepSleep();
 #endif
 }
