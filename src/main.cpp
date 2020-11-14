@@ -315,7 +315,6 @@ void lightSleep() {
     deactivateWifi();
     pinMode(39, GPIO_MODE_INPUT);
     esp_sleep_enable_timer_wakeup(SleepSecs * 1000000);
-    //esp_sleep_enable_ext0_wakeup((gpio_num_t)33,1); //1 = Low to High, 0 = High to Low. Pin pulled 
     esp_sleep_enable_ext1_wakeup(GPIO_SEL_33, ESP_EXT1_WAKEUP_ANY_HIGH);
     esp_light_sleep_start();
 }
